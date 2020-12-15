@@ -13,16 +13,17 @@ function await(PromiseInterface|array $promise, FiberLoop $loop): mixed
         $promise = all($promise);
     }
 
+    $fiber = \Fiber::this();
     $method = $promise instanceof ExtendedPromiseInterface ? 'done' : 'then';
 
-    $enqueue = static fn(\Fiber $fiber) => $promise->$method(
+    $promise->{$method}(
         static fn($value) => $loop->futureTick(static fn() => $fiber->resume($value)),
         static fn($reason) => $loop->futureTick(static fn() => $fiber->throw(
-            $reason instanceof \Throwable? $reason : new RejectedException($reason))
-        )
+            $reason instanceof \Throwable ? $reason : new RejectedException($reason)
+        ))
     );
 
-    return \Fiber::suspend($enqueue, $loop);
+    return \Fiber::suspend($loop);
 }
 
 function async(FiberLoop $loop, callable $callback, mixed ...$args): ExtendedPromiseInterface
