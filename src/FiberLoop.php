@@ -4,6 +4,10 @@ namespace Trowski\ReactFiber;
 
 use React\EventLoop\LoopInterface;
 use React\EventLoop\TimerInterface;
+use React\Promise\ExtendedPromiseInterface;
+use React\Promise\Promise;
+use React\Promise\PromiseInterface;
+use function React\Promise\all;
 
 /**
  * This class exists to attach the FiberScheduler interface to LoopInterface.
@@ -75,5 +79,64 @@ final class FiberLoop implements LoopInterface, \FiberScheduler
     public function stop(): void
     {
         $this->loop->stop();
+    }
+
+    /**
+     * @template TValue
+     *
+     * @param PromiseInterface $promise
+     *
+     * @psalm-param PromiseInterface<TValue> $promise
+     *
+     * @return mixed
+     *
+     * @psalm-return TValue|array<TValue>
+     *
+     * @throws \Throwable
+     */
+    public function await(PromiseInterface $promise): mixed
+    {
+        $fiber = \Fiber::this();
+        $method = $promise instanceof ExtendedPromiseInterface ? 'done' : 'then';
+
+        $promise->{$method}(
+            fn($value) => $this->loop->futureTick(static fn() => $fiber->resume($value)),
+            fn($reason) => $this->loop->futureTick(static fn() => $fiber->throw(
+                $reason instanceof \Throwable ? $reason : new RejectedException($reason)
+            ))
+        );
+
+        return \Fiber::suspend($this);
+    }
+
+
+    /**
+     * Create a new fiber (green-thread) using the given callback. The returned promise is
+     * resolved with the return value of the callback once the fiber completes execution.
+     *
+     * @template TReturn
+     *
+     * @param callable $callback
+     * @param mixed ...$args
+     *
+     * @psalm-param callable(mixed ...$args):TReturn $callback
+     *
+     * @return ExtendedPromiseInterface
+     *
+     * @psalm-return ExtendedPromiseInterface<TReturn>
+     */
+    public function async(callable $callback, mixed ...$args): ExtendedPromiseInterface
+    {
+        return new Promise(function (callable $resolve, callable $reject) use ($callback, $args): void {
+            $fiber = new \Fiber(function () use ($resolve, $reject, $callback, $args): void {
+                try {
+                    $resolve($callback(...$args));
+                } catch (\Throwable $exception) {
+                    $reject($exception);
+                }
+            });
+
+            $this->loop->futureTick(static fn() => $fiber->start());
+        });
     }
 }

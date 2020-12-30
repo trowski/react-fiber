@@ -11,12 +11,12 @@ require \dirname(__DIR__) . '/vendor/autoload.php';
 
 $loop = new FiberLoop(Factory::create());
 
-$value = await(Promise\resolve('Promise resolution value'), $loop);
+$value = $loop->await(Promise\resolve('Promise resolution value'));
 
 var_dump($value);
 
 try {
-    $value = await(Promise\reject(new \Exception('Rejection reason')), $loop);
+    $value = $loop->await(Promise\reject(new \Exception('Rejection reason')));
 } catch (\Throwable $exception) {
     var_dump($exception);
 }
