@@ -9,8 +9,6 @@ use React\Promise\Stream;
 use React\Stream\ReadableStreamInterface;
 use RingCentral\Psr7\Response;
 use Trowski\ReactFiber\FiberLoop;
-use function Trowski\ReactFiber\async;
-use function Trowski\ReactFiber\await;
 
 require \dirname(__DIR__) . '/vendor/autoload.php';
 
@@ -20,12 +18,12 @@ $browser = new Browser($loop);
 
 $request = function (string $method, string $url) use ($browser, $loop): void {
     /** @var Response $response */
-    $response = await($browser->requestStreaming($method, $url), $loop);
+    $response = $loop->await($browser->requestStreaming($method, $url));
 
     /** @var ReadableStreamInterface $stream */
     $stream = $response->getBody();
 
-    $body = await(Stream\buffer($stream), $loop);
+    $body = $loop->await(Stream\buffer($stream));
 
     var_dump(\sprintf(
         '%s %s; Status: %d; Body length: %d',
@@ -38,8 +36,8 @@ $request = function (string $method, string $url) use ($browser, $loop): void {
 
 $requests = [];
 
-$requests[] = async($loop, $request, 'GET', 'https://reactphp.org');
-$requests[] = async($loop, $request, 'GET', 'https://google.com');
-$requests[] = async($loop, $request, 'GET', 'https://www.php.net');
+$requests[] = $loop->async($request, 'GET', 'https://reactphp.org');
+$requests[] = $loop->async($request, 'GET', 'https://google.com');
+$requests[] = $loop->async($request, 'GET', 'https://www.php.net');
 
-await(Promise\all($requests), $loop);
+$loop->await(Promise\all($requests));

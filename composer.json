@@ -33,10 +33,7 @@
     "autoload": {
         "psr-4": {
             "Trowski\\ReactFiber\\": "src"
-        },
-        "files": [
-            "src/functions.php"
-        ]
+        }
     },
     "autoload-dev": {
         "psr-4": {
