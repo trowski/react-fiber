@@ -5,7 +5,6 @@ namespace Trowski\ReactFiber\Examples;
 use React\EventLoop\Factory;
 use React\Promise;
 use Trowski\ReactFiber\FiberLoop;
-use function Trowski\ReactFiber\await;
 
 require \dirname(__DIR__) . '/vendor/autoload.php';
 

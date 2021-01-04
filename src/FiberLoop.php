@@ -7,14 +7,16 @@ use React\EventLoop\TimerInterface;
 use React\Promise\ExtendedPromiseInterface;
 use React\Promise\Promise;
 use React\Promise\PromiseInterface;
-use function React\Promise\all;
 
 /**
- * This class exists to attach the FiberScheduler interface to LoopInterface.
+ * This class adds async() and await() methods to LoopInterface, as well as adding a getter
+ * for the {@see \FiberScheduler} instance associated with the loop.
  */
-final class FiberLoop implements LoopInterface, \FiberScheduler
+final class FiberLoop implements LoopInterface
 {
     private LoopInterface $loop;
+
+    private \FiberScheduler $scheduler;
 
     public function __construct(LoopInterface $loop)
     {
@@ -106,7 +108,7 @@ final class FiberLoop implements LoopInterface, \FiberScheduler
             ))
         );
 
-        return \Fiber::suspend($this);
+        return \Fiber::suspend($this->getScheduler());
     }
 
 
@@ -138,5 +140,17 @@ final class FiberLoop implements LoopInterface, \FiberScheduler
 
             $this->loop->futureTick(static fn() => $fiber->start());
         });
+    }
+
+    /**
+     * @return \FiberScheduler The fiber scheduler associated with the wrapped LoopInterface instance.
+     */
+    public function getScheduler(): \FiberScheduler
+    {
+        if (!isset($this->scheduler) || $this->scheduler->isTerminated()) {
+            $this->scheduler = new \FiberScheduler(fn() => $this->loop->run());
+        }
+
+        return $this->scheduler;
     }
 }

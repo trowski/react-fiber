@@ -43,7 +43,7 @@ class ReflectionFiber
 
     /**
      * @return bool True if the fiber has completed execution (either returning or
-     *              throwing an exception).
+     *              throwing an exception), false otherwise.
      */
     public function isTerminated(): bool { }
 }
