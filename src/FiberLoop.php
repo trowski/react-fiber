@@ -101,8 +101,6 @@ final class FiberLoop implements LoopInterface
         $method = $promise instanceof ExtendedPromiseInterface ? 'done' : 'then';
 
         $resolved = false;
-        $exception = null;
-        $result = null;
 
         if ($fiber === null) {
             // Awaiting from {main}.
@@ -117,74 +115,48 @@ final class FiberLoop implements LoopInterface
             }
 
             $promise->{$method}(
-                function (mixed $value) use (&$resolved, &$result): void {
+                function (mixed $value) use (&$resolved): void {
                     $resolved = true;
-                    $result = $value;
-
-                    if ($this->fiber->isRunning()) {
-                        \Fiber::suspend();
-                    }
+                    $this->futureTick(static fn() => \Fiber::suspend(static fn() => $value));
                 },
-                function (mixed $reason) use (&$resolved, &$exception): void {
+                function (mixed $reason) use (&$resolved): void {
                     $resolved = true;
                     $exception = $reason instanceof \Throwable ? $reason : new RejectedException($reason);
-
-                    if ($this->fiber->isRunning()) {
-                        \Fiber::suspend();
-                    }
+                    $this->futureTick(static fn() => \Fiber::suspend(static fn() => throw $exception));
                 }
             );
 
-            if (!$resolved) {
-                if ($this->fiber->isStarted()) {
-                    $this->fiber->resume();
-                } else {
-                    $this->fiber->start();
-                }
-
-                if (!$resolved) {
-                    throw new \Error('Event loop suspended or exited without resolving the promise');
-                }
-            }
-        } else {
-            if (isset($this->fiber) && $fiber === $this->fiber) {
-                throw new \Error("Cannot call %s::%s() from a loop event handler callback", self::class, __METHOD__);
-            }
-
-            $promise->{$method}(
-                static function (mixed $value) use (&$resolved, &$result, $fiber): void {
-                    $resolved = true;
-                    $result = $value;
-
-                    if ($fiber->isSuspended()) {
-                        $fiber->resume();
-                    }
-                },
-                static function (mixed $reason) use (&$resolved, &$exception, $fiber): void {
-                    $resolved = true;
-                    $exception = $reason instanceof \Throwable ? $reason : new RejectedException($reason);
-
-                    if ($fiber->isSuspended()) {
-                        $fiber->resume();
-                    }
-                }
-            );
+            $lambda = $this->fiber->isStarted() ? $this->fiber->resume() : $this->fiber->start();
 
             if (!$resolved) {
-                try {
-                    \Fiber::suspend();
-                } catch (\Throwable $exception) {
-                    throw new \Error('Exception unexpectedly thrown from Fiber::suspend()', 0, $exception);
-                }
-
-                if (!$resolved) {
-                    throw new \Error('Fiber resumed before the promise was resolved');
-                }
+                throw new \Error('Event loop suspended or exited without resolving the promise');
             }
+
+            return $lambda();
         }
 
-        if ($exception) {
-            throw $exception;
+        if (isset($this->fiber) && $fiber === $this->fiber) {
+            throw new \Error("Cannot call %s::%s() from a loop event handler callback", self::class, __METHOD__);
+        }
+
+        $promise->{$method}(
+            function (mixed $value) use (&$resolved, $fiber): void {
+                $resolved = true;
+                $this->futureTick(static fn() => $fiber->resume($value));
+            },
+            function (mixed $reason) use (&$resolved, $fiber): void {
+                $resolved = true;
+                $exception = $reason instanceof \Throwable ? $reason : new RejectedException($reason);
+                $this->futureTick(static fn() => $fiber->throw($exception));
+            }
+        );
+
+        try {
+            $result = \Fiber::suspend();
+        } finally {
+            if (!$resolved) {
+                throw new \Error('Fiber resumed before the promise was resolved');
+            }
         }
 
         return $result;
@@ -217,7 +189,7 @@ final class FiberLoop implements LoopInterface
                 }
             });
 
-            $fiber->start();
+            $this->futureTick(static fn() => $fiber->start());
         });
     }
 }
