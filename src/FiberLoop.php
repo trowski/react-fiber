@@ -136,7 +136,7 @@ final class FiberLoop implements LoopInterface
         }
 
         if (isset($this->fiber) && $fiber === $this->fiber) {
-            throw new \Error("Cannot call %s::%s() from a loop event handler callback", self::class, __METHOD__);
+            throw new \Error(\sprintf("Cannot call %s::%s() from a loop event handler callback", self::class, __METHOD__));
         }
 
         $promise->{$method}(
