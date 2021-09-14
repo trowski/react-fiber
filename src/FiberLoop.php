@@ -97,7 +97,7 @@ final class FiberLoop implements LoopInterface
      */
     public function await(PromiseInterface $promise): mixed
     {
-        $fiber = \Fiber::this();
+        $fiber = \Fiber::getCurrent();
         $method = $promise instanceof ExtendedPromiseInterface ? 'done' : 'then';
 
         $resolved = false;
