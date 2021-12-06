@@ -20,8 +20,7 @@
         }
     ],
     "require": {
-        "php": ">=8",
-        "ext-fiber": "*",
+        "php": ">=8.1",
         "react/event-loop": "^1",
         "react/promise": "^2.2"
     },
